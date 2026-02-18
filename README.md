@@ -1,7 +1,8 @@
 # zbt-z8102ax-emmc-firmware
 
-for testing purposes
+For testing purposes
 
-use at your own bricking risk
+Use at your own bricking risk
 
-the firmware comes already configured according this file https://github.com/giorez/zbt-z8102ax-emmc-firmware/tree/main/files/etc/uci-defaults
+The firmware comes already configured according this file:
+https://github.com/giorez/zbt-z8102ax-emmc-firmware/blob/main/files/etc/uci-defaults/98_z8102-ax-emmc-giorez_config
