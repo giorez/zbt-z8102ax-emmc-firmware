@@ -1,0 +1,88 @@
+# Beware! This script will be in /rom/etc/uci-defaults/ as part of the image.
+# Uncomment lines to apply
+HOST_NAME="z8102"
+WLAN_NAME="$HOST_NAME"
+WLAN_PSW="12345678"
+WWAN="usb0"
+# ROOT_PSW="admin"
+# IP="81" # set subnet IP for better tailscale managment
+# lan_ip_address="192.168.1.1" # 24.10 & earlier
+# lan_ip_address="192.168.1.1/24" # 25.12 and later, use CIDR notation
+
+# log potential errors
+exec >/tmp/setup.log 2>&1
+
+# Set root password
+if [ -n "$ROOT_PSW" ]; then
+  (echo "$ROOT_PSW"; sleep 1; echo "$ROOT_PSW") | passwd > /dev/null
+fi
+
+# Configure system
+uci set system.@system[0].hostname="$HOST_NAME"
+uci set system.@system[0].timezone='CET-1CEST,M3.5.0,M10.5.0/3'
+uci set system.@system[0].zonename='Europe/Rome'
+uci commit system
+ 
+# Configure LAN
+if [ -n "$IP" ]; then
+  uci set network.lan.ipaddr="192.168.$IP.1/24"
+  uci commit network
+fi
+
+# Configure WWAN for modem in ECM mode
+if [ -n "$WWAN" ]; then
+uci set network.wwan=interface
+uci set network.wwan.proto='dhcp'
+uci set network.wwan.device="$WWAN"
+uci set network.globals.packet_steering='1'
+uci commit network
+uci del_list firewall.wan.network='wwan' 2>/dev/null
+uci add_list firewall.wan.network='wwan'
+uci commit firewall
+fi
+
+# Configure WLAN
+if [ -n "$WLAN_NAME" ] && [ -n "$WLAN_PSW" ] && [ ${#WLAN_PSW} -ge 8 ]; then
+uci -q delete wireless.default_radio0
+uci -q delete wireless.default_radio1
+uci set wireless.radio0.channel='auto'
+uci set wireless.radio0.htmode='HE40'
+uci set wireless.radio0.country='IT'
+uci set wireless.radio0.cell_density='0'
+uci set wireless.default_radio0=wifi-iface
+uci set wireless.default_radio0.device='radio0'
+uci set wireless.default_radio0.network='lan'
+uci set wireless.default_radio0.mode='ap'
+uci set wireless.default_radio0.ssid="${WLAN_NAME}-24"
+uci set wireless.default_radio0.encryption='psk2'
+uci set wireless.default_radio0.key="$WLAN_PSW"
+uci set wireless.default_radio0.disabled='0'
+uci set wireless.radio1.channel='auto'
+uci set wireless.radio1.htmode='HE160'
+uci set wireless.radio1.cell_density='0'
+uci set wireless.default_radio1=wifi-iface
+uci set wireless.default_radio1.device='radio1'
+uci set wireless.default_radio1.network='lan'
+uci set wireless.default_radio1.mode='ap'
+uci set wireless.default_radio1.ssid="${WLAN_NAME}-50"
+uci set wireless.default_radio1.encryption='psk2'
+uci set wireless.default_radio1.key="$WLAN_PSW"
+uci set wireless.default_radio1.disabled='0'
+uci commit wireless
+fi
+
+# /etc/config/ttyd # delete default interface
+uci del ttyd.@ttyd[0].interface
+uci commit ttyd
+
+# Restart services to apply changes
+/etc/init.d/system reload
+sleep 5
+/etc/init.d/network reload
+sleep 5
+/etc/init.d/firewall reload
+sleep 5
+wifi reload
+sleep 5
+
+exit 0
